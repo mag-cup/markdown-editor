@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Markdown Editor</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="preview.css">
+</head>
+<body>
+<div id="toolbar">
+  <button data-cmd="new" title="新規 (Ctrl+N)">新規</button>
+  <button data-cmd="open" title="開く (Ctrl+O)">開く</button>
+  <button data-cmd="save" title="保存 (Ctrl+S)">保存</button>
+  <button data-cmd="saveAs" title="名前を付けて保存 (Ctrl+Shift+S)">別名保存</button>
+  <span class="sep"></span>
+  <button data-cmd="heading" title="見出し（押すたびにレベル切替）" class="icon"><b>H</b></button>
+  <button data-cmd="bold" title="太字 (Ctrl+B)" class="icon"><b>B</b></button>
+  <button data-cmd="italic" title="斜体 (Ctrl+I)" class="icon"><i>I</i></button>
+  <button data-cmd="strike" title="取り消し線 (Ctrl+Shift+X)" class="icon"><s>S</s></button>
+  <button data-cmd="code" title="コード (Ctrl+`)" class="icon mono">&lt;/&gt;</button>
+  <span class="sep"></span>
+  <button data-cmd="bullet" title="箇条書き" class="icon">&#8226;&#8801;</button>
+  <button data-cmd="ordered" title="番号付きリスト" class="icon">1.</button>
+  <button data-cmd="task" title="チェックリスト" class="icon">&#9745;</button>
+  <button data-cmd="quote" title="引用" class="icon">&#10077;</button>
+  <span class="sep"></span>
+  <button data-cmd="link" title="リンク (Ctrl+K)" class="icon">&#128279;</button>
+  <button data-cmd="image" title="画像" class="icon">&#128444;</button>
+  <button data-cmd="table" title="表" class="icon">&#9638;</button>
+  <button data-cmd="hr" title="区切り線" class="icon">&#8213;</button>
+  <span class="spacer"></span>
+  <div class="group">
+    <button data-cmd="view-editor" data-view="editor-only" title="エディタのみ (Ctrl+1)">編集</button>
+    <button data-cmd="view-split" data-view="split" title="分割表示 (Ctrl+2)">分割</button>
+    <button data-cmd="view-preview" data-view="preview-only" title="プレビューのみ (Ctrl+3)">プレビュー</button>
+  </div>
+  <button data-cmd="toggleSync" id="btnSync" title="スクロール同期" class="icon">&#8645;</button>
+  <span class="sep"></span>
+  <button data-cmd="find" title="検索・置換 (Ctrl+F)">検索</button>
+  <button data-cmd="exportHtml" title="HTML として出力">HTML出力</button>
+  <button data-cmd="exportPdf" title="PDF として出力">PDF出力</button>
+  <button data-cmd="print" title="印刷 (Ctrl+P)">印刷</button>
+  <button data-cmd="toggleTheme" id="btnTheme" title="ライト / ダーク切替" class="icon">&#9790;</button>
+</div>
+
+<div id="findbar" hidden>
+  <input id="findInput" type="text" placeholder="検索" spellcheck="false">
+  <input id="replaceInput" type="text" placeholder="置換後の文字列" spellcheck="false">
+  <label title="大文字と小文字を区別"><input type="checkbox" id="findCase">Aa</label>
+  <button data-cmd="findPrev" title="前を検索 (Shift+Enter / Shift+F3)">&#8593;</button>
+  <button data-cmd="findNext" title="次を検索 (Enter / F3)">&#8595;</button>
+  <button data-cmd="replaceOne">置換</button>
+  <button data-cmd="replaceAll">すべて置換</button>
+  <span id="findInfo"></span>
+  <span class="spacer"></span>
+  <button data-cmd="closeFind" title="閉じる (Esc)">&#10005;</button>
+</div>
+
+<main id="main" class="split">
+  <div id="editorPane">
+    <div id="backdrop" aria-hidden="true"></div>
+    <div id="mirror" aria-hidden="true"></div>
+    <textarea id="editor" spellcheck="false" placeholder="ここに Markdown を入力…（ファイルをドラッグ＆ドロップでも開けます）"></textarea>
+  </div>
+  <div id="splitter"></div>
+  <div id="previewPane">
+    <div id="remoteBar" hidden><span id="remoteInfo"></span><button id="btnRemote">表示する</button></div>
+    <article id="preview" class="markdown-body"></article>
+  </div>
+</main>
+
+<footer id="status">
+  <span id="stName"></span>
+  <span class="spacer"></span>
+  <span id="stPos"></span>
+  <span id="stCount"></span>
+  <span id="stEnc"></span>
+  <span id="stZoom"></span>
+</footer>
+
+<script src="lib/marked.min.js"></script>
+<script src="lib/purify.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
