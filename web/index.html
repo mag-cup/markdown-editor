@@ -29,6 +29,11 @@
   <button data-cmd="table" title="表" class="icon">&#9638;</button>
   <button data-cmd="hr" title="区切り線" class="icon">&#8213;</button>
   <span class="spacer"></span>
+  <select id="dialect" title="Markdown の方言（プレビュー・出力に反映）">
+    <option value="default">デフォルト</option>
+    <option value="github">GitHub</option>
+    <option value="qiita">Qiita</option>
+  </select>
   <div class="group">
     <button data-cmd="view-editor" data-view="editor-only" title="エディタのみ (Ctrl+1)">編集</button>
     <button data-cmd="view-split" data-view="split" title="分割表示 (Ctrl+2)">分割</button>
@@ -80,6 +85,7 @@
 
 <script src="lib/marked.min.js"></script>
 <script src="lib/purify.min.js"></script>
+<script src="emoji.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

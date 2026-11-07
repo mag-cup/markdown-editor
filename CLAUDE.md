@@ -46,6 +46,7 @@ dist\MarkdownEditor.exe path\to\file.md
 ## 実装上の注意
 
 - 改行コードは JS 側では常に `\n`。CRLF/LF への変換と文字コードの扱いは C# 側が持つ（読み込みで正規化し、保存時に元へ戻す）。
+- Markdown の方言（デフォルト / GitHub / Qiita）は `app.js` の `createMarked()` で、方言ごとに `marked.Marked` のインスタンスを作って切り替える（設定は `settings.dialect`）。独自のブロック要素を足したら、スクロール同期のために `BLOCK_TYPES` にも加える。絵文字の辞書は `web/emoji.js`。
 - プレビューは必ず DOMPurify を通す（`SANITIZE_NAMED_PROPS`）。見出しの id には `md-` を付けて、アプリ UI の id と衝突しないようにしている。HTML 出力では接頭辞なし。
 - `AreBrowserAcceleratorKeysEnabled = false` にしているので、F5 / Ctrl+F / Ctrl+P などはブラウザ側で処理されない。必要なキーは `app.js` の keydown で自前で実装する。
 - エディタへの挿入は `document.execCommand('insertText')` を使う（Ctrl+Z で取り消せるようにするため）。キー処理では IME 変換中（`isComposing` / keyCode 229）を必ず除外する。

@@ -24,7 +24,7 @@
   const INDENT = '    ';
 
   // ================================================================ 設定
-  const settings = { theme: 'light', view: 'split', fontSize: 14, split: 50, sync: true };
+  const settings = { theme: 'light', view: 'split', fontSize: 14, split: 50, sync: true, dialect: 'default' };
   try { Object.assign(settings, JSON.parse(localStorage.getItem('mdedit.settings') || '{}')); } catch (e) { /* ignore */ }
   function saveSettings() { localStorage.setItem('mdedit.settings', JSON.stringify(settings)); }
 
@@ -35,6 +35,7 @@
     editorPane.style.flexBasis = settings.split + '%';
     document.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === settings.view));
     $('btnSync').classList.toggle('active', settings.sync);
+    $('dialect').value = settings.dialect;
     $('stZoom').textContent = settings.fontSize + 'px';
     invalidateMap();
   }
@@ -102,7 +103,174 @@
   }
 
   // ================================================================ Markdown 描画
-  marked.use({ gfm: true, breaks: false });
+  // 方言ごとに Marked のインスタンスを作る。
+  //   default : marked の GFM そのまま
+  //   github  : + アラート（> [!NOTE] 等）、脚注、絵文字
+  //   qiita   : + :::note、ファイル名付きコードブロック、脚注、絵文字、改行を <br> に
+  const DIALECTS = ['default', 'github', 'qiita'];
+  const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function createMarked(dialect) {
+    const m = new marked.Marked({ gfm: true, breaks: dialect === 'qiita' });
+    if (dialect === 'default') return m;
+
+    // ---------- 脚注（[^id] と [^id]: 本文）
+    let defs = new Map();   // id → tokens
+    let order = new Map();  // id → 番号（参照順）
+    let refCount = new Map();
+    const footnoteDef = {
+      name: 'footnoteDef',
+      level: 'block',
+      start(src) { const i = src.search(/^\[\^[^\]\s]+\]:/m); return i < 0 ? undefined : i; },
+      tokenizer(src) {
+        const cap = /^\[\^([^\]\s]+)\]:[ \t]?([^\n]*(?:\n(?:[ \t]*\n)*(?: {4}|\t)[^\n]*)*)(?:\n|$)/.exec(src);
+        if (!cap) return undefined;
+        const body = cap[2].replace(/\n(?: {4}|\t)/g, '\n');
+        const id = cap[1].toLowerCase();
+        const tokens = this.lexer.blockTokens(body, []);
+        if (!defs.has(id)) defs.set(id, tokens);
+        return { type: 'footnoteDef', raw: cap[0], id, tokens: [] };
+      },
+      renderer() { return ''; },
+    };
+    const footnoteRef = {
+      name: 'footnoteRef',
+      level: 'inline',
+      start(src) { const i = src.indexOf('[^'); return i < 0 ? undefined : i; },
+      tokenizer(src) {
+        const cap = /^\[\^([^\]\s]+)\]/.exec(src);
+        if (!cap || !defs.has(cap[1].toLowerCase())) return undefined;
+        return { type: 'footnoteRef', raw: cap[0], id: cap[1].toLowerCase() };
+      },
+      renderer(token) {
+        let n = order.get(token.id);
+        if (!n) { n = order.size + 1; order.set(token.id, n); }
+        const c = (refCount.get(token.id) || 0) + 1;
+        refCount.set(token.id, c);
+        const rid = 'fnref-' + n + (c > 1 ? '-' + c : '');
+        return `<sup class="footnote-ref"><a href="#fn-${n}" id="${rid}">${n}</a></sup>`;
+      },
+    };
+    function renderFootnotes() {
+      if (!order.size) return '';
+      // 脚注の本文から別の脚注を参照すると order が増えるので、毎回 size を見る
+      const bodies = [];
+      for (let i = 0; i < order.size; i++) bodies.push(m.parser(defs.get(Array.from(order.keys())[i])));
+      const ids = Array.from(order.keys());
+      const items = ids.map((id, i) => {
+        const n = i + 1;
+        let back = '';
+        for (let k = 1; k <= (refCount.get(id) || 1); k++) {
+          back += ` <a href="#fnref-${n}${k > 1 ? '-' + k : ''}" class="footnote-backref" title="本文へ戻る">&#8617;${k > 1 ? `<sup>${k}</sup>` : ''}</a>`;
+        }
+        let body = bodies[i];
+        if (/<\/p>\s*$/.test(body)) body = body.replace(/<\/p>\s*$/, back + '</p>\n');
+        else body += `<p>${back.trim()}</p>\n`;
+        return `<li id="fn-${n}">\n${body}</li>\n`;
+      }).join('');
+      return `<section class="footnotes">\n<ol>\n${items}</ol>\n</section>\n`;
+    }
+
+    // ---------- 絵文字（:smile:）
+    const emoji = {
+      name: 'emoji',
+      level: 'inline',
+      // 「:」だけで区切ると https:// の自動リンクが壊れるので、辞書にある名前の位置だけを返す
+      start(src) {
+        const re = /:([a-z0-9_+\-]+):/g;
+        let cap;
+        while ((cap = re.exec(src)) !== null) {
+          if (Object.prototype.hasOwnProperty.call(window.EMOJI || {}, cap[1])) return cap.index;
+          re.lastIndex = cap.index + 1;
+        }
+        return undefined;
+      },
+      tokenizer(src) {
+        const cap = /^:([a-z0-9_+\-]+):/.exec(src);
+        if (!cap || !Object.prototype.hasOwnProperty.call(window.EMOJI || {}, cap[1])) return undefined;
+        return { type: 'emoji', raw: cap[0], name: cap[1] };
+      },
+      renderer(token) { return `<span class="emoji" title=":${token.name}:">${window.EMOJI[token.name]}</span>`; },
+    };
+
+    const extensions = [footnoteDef, footnoteRef, emoji];
+    const renderer = {};
+
+    if (dialect === 'github') {
+      // ---------- GitHub のアラート
+      const ALERT_TITLES = { note: 'Note', tip: 'Tip', important: 'Important', warning: 'Warning', caution: 'Caution' };
+      extensions.push({
+        name: 'githubAlert',
+        level: 'block',
+        start(src) { const i = src.search(/^ {0,3}>[ \t]*\[!/m); return i < 0 ? undefined : i; },
+        tokenizer(src) {
+          if (!/^ {0,3}>[ \t]*\[!(?:note|tip|important|warning|caution)\][ \t]*(?:\n|$)/i.test(src)) return undefined;
+          const bq = this.lexer.tokenizer.blockquote(src);
+          if (!bq) return undefined;
+          const nl = bq.text.indexOf('\n');
+          const head = nl < 0 ? bq.text : bq.text.slice(0, nl);
+          const kind = /\[!(\w+)\]/.exec(head)[1].toLowerCase();
+          const top = this.lexer.state.top;
+          this.lexer.state.top = true;
+          const tokens = this.lexer.blockTokens(nl < 0 ? '' : bq.text.slice(nl + 1), []);
+          this.lexer.state.top = top;
+          return { type: 'githubAlert', raw: bq.raw, kind, tokens };
+        },
+        renderer(token) {
+          return `<div class="markdown-alert markdown-alert-${token.kind}">\n` +
+            `<p class="markdown-alert-title">${ALERT_TITLES[token.kind]}</p>\n${this.parser.parse(token.tokens)}</div>\n`;
+        },
+      });
+    }
+
+    if (dialect === 'qiita') {
+      // ---------- Qiita の :::note info / warn / alert
+      extensions.push({
+        name: 'qiitaNote',
+        level: 'block',
+        start(src) { const i = src.search(/^:::note/m); return i < 0 ? undefined : i; },
+        tokenizer(src) {
+          const head = /^:::note(?:[ \t]+(info|warn|alert))?[ \t]*(?:\n|$)/.exec(src);
+          if (!head) return undefined;
+          const rest = src.slice(head[0].length);
+          const end = /(^|\n):::[ \t]*(?:\n|$)/.exec(rest);
+          if (!end) return undefined;
+          const raw = src.slice(0, head[0].length + end.index + end[0].length);
+          const tokens = this.lexer.blockTokens(rest.slice(0, end.index), []);
+          return { type: 'qiitaNote', raw, kind: head[1] || 'info', tokens };
+        },
+        renderer(token) {
+          return `<div class="qiita-note qiita-note-${token.kind}">\n${this.parser.parse(token.tokens)}</div>\n`;
+        },
+      });
+      // ---------- ```ruby:ファイル名
+      renderer.code = (token) => {
+        const cap = /^([^\s:]*):(\S+)/.exec((token.lang || '').trim());
+        if (!cap) return false;
+        const text = token.text.replace(/\n$/, '') + '\n';
+        const cls = cap[1] ? ` class="language-${escHtml(cap[1])}"` : '';
+        return `<div class="code-frame"><div class="code-filename">${escHtml(cap[2])}</div>` +
+          `<pre><code${cls}>${escHtml(text)}</code></pre></div>\n`;
+      };
+    }
+
+    m.use({
+      extensions,
+      renderer,
+      hooks: {
+        preprocess(src) { defs = new Map(); order = new Map(); refCount = new Map(); return src; },
+        postprocess(html) { return html + renderFootnotes(); },
+      },
+    });
+    return m;
+  }
+
+  let md = null;
+  function setDialect() {
+    if (!DIALECTS.includes(settings.dialect)) settings.dialect = 'default';
+    md = createMarked(settings.dialect);
+  }
+  setDialect();
 
   const purifyPreview = { FORBID_TAGS: ['style', 'form'], SANITIZE_NAMED_PROPS: true };
   const purifyExport = { FORBID_TAGS: ['style', 'form'] };
@@ -124,9 +292,9 @@
     });
   }
 
-  function renderFragment(md, forPreview) {
+  function renderFragment(src, forPreview) {
     const tpl = document.createElement('template');
-    tpl.innerHTML = DOMPurify.sanitize(marked.parse(md), forPreview ? purifyPreview : purifyExport);
+    tpl.innerHTML = DOMPurify.sanitize(md.parse(src), forPreview ? purifyPreview : purifyExport);
     addHeadingIds(tpl.content, forPreview ? 'md-' : '');
     return tpl;
   }
@@ -299,12 +467,12 @@
   }
 
   // ================================================================ スクロール同期
-  const BLOCK_TYPES = new Set(['paragraph', 'heading', 'code', 'table', 'hr', 'blockquote', 'list']);
+  const BLOCK_TYPES = new Set(['paragraph', 'heading', 'code', 'table', 'hr', 'blockquote', 'list', 'githubAlert', 'qiitaNote']);
   let map = null;
   function invalidateMap() { map = null; }
 
   function buildMap() {
-    const tokens = marked.lexer(editor.value);
+    const tokens = md.lexer(editor.value);
     const lines = [];
     const types = [];
     let line = 0;
@@ -315,7 +483,8 @@
       line += (t.raw.match(/\n/g) || []).length;
     }
 
-    const els = Array.from(preview.children);
+    // 末尾に付け足す脚注の一覧は、トークンと対応しないので除く
+    const els = Array.from(preview.children).filter((el) => !el.classList.contains('footnotes'));
     let pairs = [];
     if (!hasHtml && els.length === lines.length) {
       pairs = lines.map((l, i) => [l, els[i]]);
@@ -871,6 +1040,15 @@ ${tpl.innerHTML}
   document.querySelectorAll('[data-cmd]').forEach((b) => {
     b.addEventListener('mousedown', (e) => e.preventDefault()); // エディタのフォーカス・選択を維持
     b.addEventListener('click', () => run(b.dataset.cmd));
+  });
+
+  $('dialect').addEventListener('change', (e) => {
+    settings.dialect = e.target.value;
+    setDialect();
+    saveSettings();
+    applySettings();
+    renderNow();
+    editor.focus();
   });
 
   // ================================================================ キーボード

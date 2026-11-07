@@ -137,3 +137,81 @@
 .markdown-body tr:nth-child(2n) { background: var(--md-table-alt); }
 
 .markdown-body details summary { cursor: pointer; }
+
+/* ---------- 脚注（GitHub / Qiita） */
+.markdown-body .footnote-ref a { font-size: .75em; }
+.markdown-body sup.footnote-ref { line-height: 0; }
+.markdown-body .footnotes {
+  margin-top: 32px;
+  padding-top: 8px;
+  font-size: .875em;
+  color: var(--md-muted);
+  border-top: 1px solid var(--md-border);
+}
+.markdown-body .footnotes ol { padding-left: 1.5em; }
+.markdown-body .footnotes li > p { margin: 0 0 4px; }
+.markdown-body .footnote-backref { margin-left: .2em; }
+
+.markdown-body .emoji { font-family: "Segoe UI Emoji", "Segoe UI Symbol", sans-serif; }
+
+/* ---------- GitHub のアラート */
+.markdown-body .markdown-alert {
+  --alert: var(--md-link);
+  margin-bottom: 16px;
+  padding: 8px 16px;
+  border-left: .25em solid var(--alert);
+}
+.markdown-body .markdown-alert > :last-child { margin-bottom: 0; }
+.markdown-body .markdown-alert-title { color: var(--alert); font-weight: 600; margin-bottom: 4px; }
+.markdown-body .markdown-alert-note .markdown-alert-title::before { content: "\2139\FE0E  "; }
+.markdown-body .markdown-alert-tip .markdown-alert-title::before { content: "\1F4A1  "; }
+.markdown-body .markdown-alert-important .markdown-alert-title::before { content: "\2757  "; }
+.markdown-body .markdown-alert-warning .markdown-alert-title::before { content: "\26A0\FE0E  "; }
+.markdown-body .markdown-alert-caution .markdown-alert-title::before { content: "\26D4\FE0E  "; }
+.markdown-body .markdown-alert-note { --alert: #0969da; }
+.markdown-body .markdown-alert-tip { --alert: #1a7f37; }
+.markdown-body .markdown-alert-important { --alert: #8250df; }
+.markdown-body .markdown-alert-warning { --alert: #9a6700; }
+.markdown-body .markdown-alert-caution { --alert: #d1242f; }
+[data-theme="dark"] .markdown-body .markdown-alert-note { --alert: #4493f8; }
+[data-theme="dark"] .markdown-body .markdown-alert-tip { --alert: #3fb950; }
+[data-theme="dark"] .markdown-body .markdown-alert-important { --alert: #ab7df8; }
+[data-theme="dark"] .markdown-body .markdown-alert-warning { --alert: #d29922; }
+[data-theme="dark"] .markdown-body .markdown-alert-caution { --alert: #f85149; }
+
+/* ---------- Qiita の :::note */
+.markdown-body .qiita-note {
+  --note: #55c500;
+  --note-bg: #f1fbe9;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  color: var(--md-fg);
+  background: var(--note-bg);
+  border-left: 4px solid var(--note);
+  border-radius: 4px;
+}
+.markdown-body .qiita-note > :last-child { margin-bottom: 0; }
+.markdown-body .qiita-note-warn { --note: #e6a700; --note-bg: #fdf8e5; }
+.markdown-body .qiita-note-alert { --note: #e5534b; --note-bg: #fdeceb; }
+[data-theme="dark"] .markdown-body .qiita-note { --note-bg: #55c5001f; }
+[data-theme="dark"] .markdown-body .qiita-note-warn { --note-bg: #e6a7001f; }
+[data-theme="dark"] .markdown-body .qiita-note-alert { --note-bg: #e5534b26; }
+
+/* ---------- Qiita のファイル名付きコードブロック */
+.markdown-body .code-frame { margin-bottom: 16px; }
+.markdown-body .code-frame pre { margin-bottom: 0; border-top-left-radius: 0; }
+.markdown-body .code-filename {
+  display: inline-block;
+  padding: 2px 10px;
+  font-family: "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", monospace;
+  font-size: 85%;
+  color: var(--md-fg);
+  background: var(--md-code-bg);
+  border-radius: 6px 6px 0 0;
+}
+
+@media print {
+  [data-theme="dark"] .markdown-body .qiita-note-info { --note-bg: #f1fbe9; }
+  [data-theme="dark"] .markdown-body .qiita-note-warn { --note-bg: #fdf8e5; }
+  [data-theme="dark"] .markdown-body .qiita-note-alert { --note-bg: #fdeceb; }
+}
